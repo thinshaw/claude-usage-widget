@@ -1,0 +1,8 @@
+ClaudeWidget.xcodeproj/
+ClaudeWidget-Info.plist
+ClaudeWidget.entitlements
+build/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+.DS_Store
