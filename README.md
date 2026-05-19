@@ -52,22 +52,53 @@ xcodebuild -project ClaudeWidget.xcodeproj \
 open build/Build/Products/Release/ClaudeWidget.app
 ```
 
-## Setup — pasting session cookies
+## Setup — pasting your sessionKey cookie
 
-The widget authenticates by reusing the `sessionKey` cookie from your existing claude.ai login. It does not store your password, does not touch the desktop app's storage, and does not phone home.
+The widget authenticates by borrowing the `sessionKey` cookie from your existing claude.ai login. No passwords, no API keys, no telemetry. The cookie is stored only in your macOS Keychain under service `com.tobyhinshaw.claudewidget`.
 
-For each account:
+You'll do this **once per account** when you first install the widget, and **again whenever the cookie expires** (probably every 1–3 months). When that happens the widget will show a red `Session expired — re-paste your sessionKey cookie.` notice; just repeat these steps.
 
-1. Open https://claude.ai in Safari and log in
-2. Press **Cmd+Option+I** to open Web Inspector
-3. Click the **Storage** tab → **Cookies → claude.ai**
-4. Find the row named `sessionKey` and copy its value (the long `sk-ant-sid02-…` string)
-5. Open the widget → Settings → **Accounts** → expand Personal (or Work)
-6. Paste into the sessionKey field → **Save**
+### Step-by-step (Safari)
 
-The widget will auto-discover your org UUID via `/api/organizations` and start polling. The cookie is stored in the macOS Keychain under service `com.tobyhinshaw.claudewidget`.
+> First time? Make sure the Develop menu is on:
+> **Safari menu → Settings… → Advanced → ✅ "Show features for web developers"**
 
-For your second account, log into it in a Safari private window (so the first account stays logged in elsewhere), repeat steps 2–4, and paste into the Work slot in the widget.
+1. **Open https://claude.ai in Safari** and sign into the account you want to track. For your **second** account, do this in a Safari **Private** window (`File → New Private Window`) so the first account stays signed in too.
+
+2. **Open Web Inspector**: press **⌥⌘I** (Option-Command-I), or `Develop menu → Show Web Inspector`.
+
+3. **Click the Storage tab** at the top of the inspector. (Not Network. Not Console. **Storage**.)
+
+4. In the left sidebar of the Storage tab, expand **Cookies** and click **`claude.ai`**.
+
+5. You'll see a table of cookies. Find the row named **`sessionKey`** (sorting by Name column makes it easier). The value will be a very long string that starts with `sk-ant-sid02-…` and is about 110 characters long.
+
+6. **Triple-click** the value to select the whole thing, then **⌘C** to copy.
+
+7. Open ClaudeWidget → click the menu-bar sparkles icon → **Settings…** → **Accounts** tab.
+
+8. Expand the section for the account (**Personal** or **Work**) you're configuring.
+
+9. Paste into the **sessionKey value** field → click **Save**.
+
+10. If the account has access to more than one Anthropic org (e.g. a personal claude.ai subscription plus an API Console org), an **Organization** dropdown will appear under that account once the cookie is saved. Pick whichever org you want this slot to track. You can swap later.
+
+That's it. Within ~60 seconds you should see live numbers on the menu bar dropdown.
+
+### Cheat sheet
+
+```
+Safari → claude.ai → log in
+⌥⌘I → Storage tab → Cookies → claude.ai → sessionKey → copy value
+ClaudeWidget menu → Settings → Accounts → paste → Save → pick org
+```
+
+### Troubleshooting
+
+- **`Session expired — re-paste your sessionKey cookie.`** — your cookie aged out. Repeat the steps above. Same as the first install, just one slot at a time.
+- **`No accessible organizations.`** — the cookie didn't reach claude.ai's auth check. Usually means you copied the cookie name instead of the value, or copied an old/expired cookie. Try again, making sure you're copying the long `sk-ant-sid02-…` value field, not the `sessionKey` name field.
+- **Numbers are wrong / look like the other account's** — wrong org selected. Open Settings → Accounts → change the Organization dropdown for that slot.
+- **No Storage tab in Web Inspector** — older Safari, or Web Inspector got swapped to a tab without that view. Try closing and reopening with ⌥⌘I.
 
 ## How it works
 
