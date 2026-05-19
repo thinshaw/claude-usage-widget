@@ -52,53 +52,73 @@ xcodebuild -project ClaudeWidget.xcodeproj \
 open build/Build/Products/Release/ClaudeWidget.app
 ```
 
-## Setup — pasting your sessionKey cookie
+## Setup — how to paste the cookie (read me when the widget says "Session expired")
 
-The widget authenticates by borrowing the `sessionKey` cookie from your existing claude.ai login. No passwords, no API keys, no telemetry. The cookie is stored only in your macOS Keychain under service `com.tobyhinshaw.claudewidget`.
+You'll do this once per account at first install, and again any time the widget shows a red `Session expired — re-paste your sessionKey cookie.` notice. Just follow the steps. Don't think.
 
-You'll do this **once per account** when you first install the widget, and **again whenever the cookie expires** (probably every 1–3 months). When that happens the widget will show a red `Session expired — re-paste your sessionKey cookie.` notice; just repeat these steps.
+### One-time only (you've probably already done this)
 
-### Step-by-step (Safari)
+Open Safari. Click the **Safari** menu (top-left) → **Settings…** → **Advanced** tab → check the box that says **"Show features for web developers"**. Close Settings. That puts a **Develop** menu in Safari's menu bar. You only need to do this once, ever.
 
-> First time? Make sure the Develop menu is on:
-> **Safari menu → Settings… → Advanced → ✅ "Show features for web developers"**
+### Every time you need to paste a cookie
 
-1. **Open https://claude.ai in Safari** and sign into the account you want to track. For your **second** account, do this in a Safari **Private** window (`File → New Private Window`) so the first account stays signed in too.
+Do these steps **one account at a time**. Don't try to do Personal and Work in the same Safari window — they'll fight each other.
 
-2. **Open Web Inspector**: press **⌥⌘I** (Option-Command-I), or `Develop menu → Show Web Inspector`.
+**1.** Open Safari.
 
-3. **Click the Storage tab** at the top of the inspector. (Not Network. Not Console. **Storage**.)
+**2.** Go to **https://claude.ai** and sign in with the account you want to update.
 
-4. In the left sidebar of the Storage tab, expand **Cookies** and click **`claude.ai`**.
+> Doing your **second** account? Open a **Private** window first (`File` menu → `New Private Window`), then go to claude.ai in that window. Sign into the second account there. This keeps the first account signed in elsewhere.
 
-5. You'll see a table of cookies. Find the row named **`sessionKey`** (sorting by Name column makes it easier). The value will be a very long string that starts with `sk-ant-sid02-…` and is about 110 characters long.
-
-6. **Triple-click** the value to select the whole thing, then **⌘C** to copy.
-
-7. Open ClaudeWidget → click the menu-bar sparkles icon → **Settings…** → **Accounts** tab.
-
-8. Expand the section for the account (**Personal** or **Work**) you're configuring.
-
-9. Paste into the **sessionKey value** field → click **Save**.
-
-10. If the account has access to more than one Anthropic org (e.g. a personal claude.ai subscription plus an API Console org), an **Organization** dropdown will appear under that account once the cookie is saved. Pick whichever org you want this slot to track. You can swap later.
-
-That's it. Within ~60 seconds you should see live numbers on the menu bar dropdown.
-
-### Cheat sheet
+**3.** Once you're signed in and you can see your chats, press these three keys at the same time:
 
 ```
-Safari → claude.ai → log in
-⌥⌘I → Storage tab → Cookies → claude.ai → sessionKey → copy value
-ClaudeWidget menu → Settings → Accounts → paste → Save → pick org
+⌥  +  ⌘  +  I
 ```
 
-### Troubleshooting
+(That's Option, Command, and the letter I.) A panel will open on the right or bottom — that's Web Inspector.
 
-- **`Session expired — re-paste your sessionKey cookie.`** — your cookie aged out. Repeat the steps above. Same as the first install, just one slot at a time.
-- **`No accessible organizations.`** — the cookie didn't reach claude.ai's auth check. Usually means you copied the cookie name instead of the value, or copied an old/expired cookie. Try again, making sure you're copying the long `sk-ant-sid02-…` value field, not the `sessionKey` name field.
-- **Numbers are wrong / look like the other account's** — wrong org selected. Open Settings → Accounts → change the Organization dropdown for that slot.
-- **No Storage tab in Web Inspector** — older Safari, or Web Inspector got swapped to a tab without that view. Try closing and reopening with ⌥⌘I.
+**4.** At the very top of the Web Inspector panel, you'll see a row of tabs: *Elements*, *Network*, *Sources*, *Storage*, etc. Click **Storage**.
+
+**5.** On the left side of the Storage panel, find the **Cookies** section. Click the little triangle next to it to expand it. Underneath, click the line that says **`claude.ai`**.
+
+**6.** A big table appears with one cookie per row. Look at the **Name** column. Find the row whose Name is exactly **`sessionKey`** (not `sessionKeyLC`, just `sessionKey`).
+
+**7.** Look at the **Value** column for that row. It's a long ugly string that looks like:
+
+```
+sk-ant-sid02-m1hrec...wwnNj4FE5m1APdNHhGfBA-u-x7dQAA
+```
+
+(yours will be different, but the start `sk-ant-sid02-` is the same).
+
+**8.** Click anywhere on that Value cell. Press **⌘A** to select everything, then **⌘C** to copy it.
+
+> If `⌘A` doesn't grab it, try **triple-clicking** the value to select the whole line, then **⌘C**.
+
+**9.** In your menu bar (top-right of your screen), click the orange **sparkle icon** for ClaudeWidget. A dropdown appears. At the bottom of the dropdown, click **Settings…**.
+
+**10.** In the Settings window, click the **Accounts** tab.
+
+**11.** Find the account you're updating (**Personal** or **Work**). Click in the **sessionKey value** field next to it. Press **⌘V** to paste.
+
+**12.** Click **Save**.
+
+**13.** Wait about 5 seconds. If an **Organization** dropdown appears under that account, pick the right one:
+   - **Personal slot** → pick the org named after you, or the one whose name you recognize as your personal claude.ai account
+   - **Work slot** → pick the org with the API Console / extra-usage budget on it
+
+**14.** Close the Settings window. Click the sparkle icon in the menu bar. The numbers for that account should now be real (not stale or red).
+
+### If something goes wrong
+
+| What the widget shows | What it means | What to do |
+|---|---|---|
+| `Session expired — re-paste your sessionKey cookie.` | Cookie aged out | Redo steps 1–14 for that account |
+| `No accessible organizations.` | You copied the cookie name instead of its value, OR the cookie is already dead | Repeat step 7 carefully — copy the long `sk-ant-sid02-…` string, not the word `sessionKey` |
+| Both accounts show identical numbers | Wrong org selected on one of them | Settings → Accounts → change the **Organization** dropdown |
+| The Storage tab isn't there | Inspector got into a weird state | Close inspector, press ⌥⌘I again |
+| Sparkle icon is gone from menu bar | The app got quit | `open /Applications/ClaudeWidget.app` from Terminal, or find it in Spotlight |
 
 ## How it works
 
