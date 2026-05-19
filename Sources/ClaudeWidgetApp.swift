@@ -29,8 +29,8 @@ struct MenuBarLabel: View {
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: "sparkles")
-            if let pct = state.combinedRemainingPercent {
-                Text("\(Int(pct * 100))%")
+            if let pct = state.peakUtilization {
+                Text("\(Int(round(pct * 100)))%")
                     .font(.system(size: 11, weight: .medium, design: .rounded))
                     .monospacedDigit()
             }

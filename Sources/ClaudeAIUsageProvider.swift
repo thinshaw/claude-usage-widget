@@ -13,6 +13,19 @@ import Foundation
 struct ClaudeAIUsageProvider: UsageProvider {
     private static let base = "https://claude.ai"
 
+    /// Dedicated URLSession that does NOT share the global cookie storage and
+    /// will not auto-send or auto-store cookies. We must enforce this because
+    /// every request carries an explicit `Cookie: sessionKey=…` header for a
+    /// specific account, and we'd get cross-account contamination if URLSession
+    /// silently merged in cookies it had cached from a previous account's reply.
+    private static let session: URLSession = {
+        let cfg = URLSessionConfiguration.default
+        cfg.httpCookieStorage = nil
+        cfg.httpCookieAcceptPolicy = .never
+        cfg.httpShouldSetCookies = false
+        return URLSession(configuration: cfg)
+    }()
+
     enum ProviderError: LocalizedError {
         case noSessionCookie
         case noOrganizations
@@ -36,27 +49,58 @@ struct ClaudeAIUsageProvider: UsageProvider {
             throw ProviderError.noSessionCookie
         }
 
-        let orgID = try await resolveOrgID(for: kind, cookie: cookie)
-        let url = URL(string: "\(Self.base)/api/organizations/\(orgID)/usage")!
+        // If the user (or a prior auto-pick) chose an org for this slot, use it
+        // directly. Don't auto-fall-back to a different one — that would hide
+        // configuration mistakes and produce the wrong account's data.
+        if let cached = OrgIDStore.load(for: kind) {
+            let url = URL(string: "\(Self.base)/api/organizations/\(cached)/usage")!
+            let data = try await Self.get(url: url, cookie: cookie)
+            return try Self.parseUsage(data)
+        }
 
-        let data = try await Self.get(url: url, cookie: cookie)
-        return try Self.parseUsage(data)
+        // No selection yet: auto-pick the first org whose /usage endpoint
+        // responds, and cache it. The user can override via Settings.
+        let orgs = try await fetchOrganizations(cookie: cookie)
+        guard !orgs.isEmpty else { throw ProviderError.noOrganizations }
+
+        var lastError: Error?
+        for org in orgs {
+            do {
+                let url = URL(string: "\(Self.base)/api/organizations/\(org.uuid)/usage")!
+                let data = try await Self.get(url: url, cookie: cookie)
+                let usage = try Self.parseUsage(data)
+                OrgIDStore.save(org.uuid, for: kind)
+                return usage
+            } catch {
+                lastError = error
+                continue
+            }
+        }
+        throw lastError ?? ProviderError.noOrganizations
+    }
+
+    /// Public org-listing used by Settings so the user can pick which org each
+    /// account slot tracks.
+    func fetchOrganizations(for kind: AccountKind) async throws -> [Organization] {
+        guard let cookie = SessionCookieStore.load(for: kind), !cookie.isEmpty else {
+            throw ProviderError.noSessionCookie
+        }
+        return try await fetchOrganizations(cookie: cookie)
     }
 
     // MARK: - Org discovery
 
-    private func resolveOrgID(for kind: AccountKind, cookie: String) async throws -> String {
-        if let cached = OrgIDStore.load(for: kind) { return cached }
+    private func fetchOrganizations(cookie: String) async throws -> [Organization] {
         let url = URL(string: "\(Self.base)/api/organizations")!
         let data = try await Self.get(url: url, cookie: cookie)
         guard let arr = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
             throw ProviderError.decoding("/api/organizations was not a JSON array")
         }
-        guard let uuid = arr.first?["uuid"] as? String, !uuid.isEmpty else {
-            throw ProviderError.noOrganizations
+        return arr.compactMap { dict in
+            guard let uuid = dict["uuid"] as? String, !uuid.isEmpty else { return nil }
+            let name = (dict["name"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "Org \(uuid.prefix(8))"
+            return Organization(uuid: uuid, name: name)
         }
-        OrgIDStore.save(uuid, for: kind)
-        return uuid
     }
 
     // MARK: - HTTP
@@ -64,7 +108,9 @@ struct ClaudeAIUsageProvider: UsageProvider {
     private static func get(url: URL, cookie: String) async throws -> Data {
         var req = URLRequest(url: url)
         req.httpMethod = "GET"
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        // Belt-and-suspenders: also disable cookie handling at the request level
+        // so an explicit Cookie header is never augmented by URLSession.
+        req.httpShouldHandleCookies = false
         req.setValue("*/*", forHTTPHeaderField: "Accept")
         req.setValue("sessionKey=\(cookie)", forHTTPHeaderField: "Cookie")
         req.setValue("web_claude_ai", forHTTPHeaderField: "anthropic-client-platform")
@@ -73,10 +119,16 @@ struct ClaudeAIUsageProvider: UsageProvider {
             forHTTPHeaderField: "User-Agent"
         )
         req.setValue("https://claude.ai", forHTTPHeaderField: "Origin")
-        req.setValue("https://claude.ai/", forHTTPHeaderField: "Referer")
+        req.setValue("https://claude.ai/settings/usage", forHTTPHeaderField: "Referer")
+        // Sec-Fetch-* headers normally added by the browser. Cloudflare's bot
+        // detection flags their absence; matching the browser request fingerprint
+        // dramatically reduces transient 401/403s.
+        req.setValue("empty", forHTTPHeaderField: "Sec-Fetch-Dest")
+        req.setValue("cors", forHTTPHeaderField: "Sec-Fetch-Mode")
+        req.setValue("same-origin", forHTTPHeaderField: "Sec-Fetch-Site")
         req.timeoutInterval = 20
 
-        let (data, response) = try await URLSession.shared.data(for: req)
+        let (data, response) = try await session.data(for: req)
         guard let http = response as? HTTPURLResponse else {
             throw ProviderError.decoding("no HTTP response")
         }
@@ -143,10 +195,15 @@ struct ClaudeAIUsageProvider: UsageProvider {
 
         var extra: ExtraUsage?
         if let e = json["extra_usage"] as? [String: Any] {
+            // claude.ai sends monthly_limit and used_credits in *cents*
+            // (e.g. 27500 = $275.00). Normalize to dollars so the model is
+            // a real currency amount.
+            let limitCents = (e["monthly_limit"] as? Double) ?? 0
+            let usedCents  = (e["used_credits"]  as? Double) ?? 0
             extra = ExtraUsage(
                 isEnabled:    (e["is_enabled"] as? Bool) ?? false,
-                monthlyLimit: (e["monthly_limit"] as? Double) ?? 0,
-                usedCredits:  (e["used_credits"] as? Double) ?? 0,
+                monthlyLimit: limitCents / 100.0,
+                usedCredits:  usedCents / 100.0,
                 utilization:  ((e["utilization"] as? Double) ?? 0) / 100.0,
                 currency:     (e["currency"] as? String) ?? "USD"
             )

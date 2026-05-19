@@ -52,12 +52,21 @@ struct AccountUsage: Equatable {
         windows.max { $0.utilization < $1.utilization }
     }
 
-    /// 0…1 remaining fraction across the most-utilized window (used by the
-    /// menu bar percentage badge). Defaults to 1 (full) if no windows are active.
-    var remainingPercent: Double {
-        guard let w = primaryWindow else { return 1.0 }
-        return max(0, min(1, 1.0 - w.utilization))
+    /// Highest utilization 0…1 across every active limit on this account —
+    /// time windows AND extra-usage credits. This is the "how close am I to a
+    /// cap on this account" number.
+    var peakUtilization: Double {
+        var peak: Double = 0
+        for w in windows { peak = Swift.max(peak, w.utilization) }
+        if let e = extra, e.isEnabled { peak = Swift.max(peak, e.utilization) }
+        return min(1, peak)
     }
+}
+
+struct Organization: Identifiable, Equatable, Hashable {
+    let uuid: String
+    let name: String
+    var id: String { uuid }
 }
 
 struct Account: Identifiable, Equatable {
@@ -65,6 +74,8 @@ struct Account: Identifiable, Equatable {
     var label: String
     var isConfigured: Bool
     var usage: AccountUsage?
+    var availableOrgs: [Organization] = []
+    var selectedOrgUUID: String?
 
     var id: String { kind.id }
 }

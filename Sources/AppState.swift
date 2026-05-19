@@ -11,7 +11,7 @@ final class AppState: ObservableObject {
     @Published var lastError: String?
 
     private var refreshTimer: Timer?
-    private let realProvider: UsageProvider = ClaudeAIUsageProvider()
+    private let realProvider = ClaudeAIUsageProvider()
     private let mockProvider: UsageProvider = MockUsageProvider()
 
     private func provider(for kind: AccountKind) -> UsageProvider {
@@ -24,20 +24,28 @@ final class AppState: ObservableObject {
         self.theme = savedTheme
 
         self.accounts = [
-            Account(kind: .personal, label: "Personal", isConfigured: true, usage: nil),
-            Account(kind: .work,     label: "Work",     isConfigured: true, usage: nil),
+            Account(kind: .personal, label: "Personal", isConfigured: true, usage: nil,
+                    selectedOrgUUID: OrgIDStore.load(for: .personal)),
+            Account(kind: .work,     label: "Work",     isConfigured: true, usage: nil,
+                    selectedOrgUUID: OrgIDStore.load(for: .work)),
         ]
 
-        Task { await refreshAll() }
+        Task {
+            for account in accounts where SessionCookieStore.has(account.kind) {
+                await loadOrganizations(for: account.kind)
+            }
+            await refreshAll()
+        }
         startAutoRefresh()
     }
 
-    var combinedRemainingPercent: Double? {
+    /// Highest utilization across every active limit on every configured
+    /// account. Drives the menu-bar percentage badge — "the most-maxed-out
+    /// thing I'm tracking right now."
+    var peakUtilization: Double? {
         let configured = accounts.filter { $0.isConfigured }
-        let usages = configured.compactMap { $0.usage }
-        guard !usages.isEmpty else { return nil }
-        let avg = usages.map(\.remainingPercent).reduce(0, +) / Double(usages.count)
-        return avg
+        let peaks = configured.compactMap { $0.usage?.peakUtilization }
+        return peaks.max()
     }
 
     func refreshAll() async {
@@ -65,7 +73,13 @@ final class AppState: ObservableObject {
                 case .success(let usage):
                     accounts[idx].usage = usage
                 case .failure(let error):
-                    lastError = "\(kind.displayName): \(error.localizedDescription)"
+                    // Only surface the error if we have no data to show; an
+                    // intermittent 401 / 5xx while the last-good numbers are
+                    // still on screen would mislead the user into thinking the
+                    // session is dead when it isn't.
+                    if accounts[idx].usage == nil {
+                        lastError = "\(kind.displayName): \(error.localizedDescription)"
+                    }
                 }
             }
         }
@@ -85,8 +99,20 @@ final class AppState: ObservableObject {
     @discardableResult
     func saveSessionCookie(_ cookie: String, for kind: AccountKind) -> Bool {
         let ok = SessionCookieStore.save(cookie, for: kind)
-        if ok { Task { await refreshAll() } }
-        return ok
+        guard ok else { return false }
+        // Loading a new cookie may unlock a different set of orgs — clear any
+        // prior selection and force re-discovery.
+        OrgIDStore.clear(for: kind)
+        if let idx = accounts.firstIndex(where: { $0.kind == kind }) {
+            accounts[idx].selectedOrgUUID = nil
+            accounts[idx].availableOrgs = []
+            accounts[idx].usage = nil
+        }
+        Task {
+            await loadOrganizations(for: kind)
+            await refreshAll()
+        }
+        return true
     }
 
     @discardableResult
@@ -95,12 +121,38 @@ final class AppState: ObservableObject {
         OrgIDStore.clear(for: kind)
         if let idx = accounts.firstIndex(where: { $0.kind == kind }) {
             accounts[idx].usage = nil
+            accounts[idx].availableOrgs = []
+            accounts[idx].selectedOrgUUID = nil
         }
         return ok
     }
 
     func hasSessionCookie(for kind: AccountKind) -> Bool {
         SessionCookieStore.has(kind)
+    }
+
+    func loadOrganizations(for kind: AccountKind) async {
+        guard SessionCookieStore.has(kind) else { return }
+        do {
+            let orgs = try await realProvider.fetchOrganizations(for: kind)
+            guard let idx = accounts.firstIndex(where: { $0.kind == kind }) else { return }
+            accounts[idx].availableOrgs = orgs
+            if let cached = OrgIDStore.load(for: kind),
+               orgs.contains(where: { $0.uuid == cached }) {
+                accounts[idx].selectedOrgUUID = cached
+            }
+        } catch {
+            // Non-fatal: the picker just won't populate. fetchUsage uses the
+            // cached UUID and works independently of this lookup.
+        }
+    }
+
+    func setSelectedOrg(_ uuid: String, for kind: AccountKind) {
+        OrgIDStore.save(uuid, for: kind)
+        guard let idx = accounts.firstIndex(where: { $0.kind == kind }) else { return }
+        accounts[idx].selectedOrgUUID = uuid
+        accounts[idx].usage = nil
+        Task { await refreshAll() }
     }
 
     private func startAutoRefresh() {

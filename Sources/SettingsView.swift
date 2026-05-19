@@ -96,6 +96,21 @@ private struct AccountRow: View {
                     .foregroundStyle(messageIsError ? .red : .secondary)
             }
 
+            if state.hasSessionCookie(for: account.kind) && !account.availableOrgs.isEmpty {
+                Picker("Organization", selection: Binding(
+                    get: { account.selectedOrgUUID ?? account.availableOrgs.first?.uuid ?? "" },
+                    set: { state.setSelectedOrg($0, for: account.kind) }
+                )) {
+                    ForEach(account.availableOrgs) { org in
+                        Text(org.name).tag(org.uuid)
+                    }
+                }
+                Text("Pick which org this slot tracks. The same login can own multiple orgs (e.g. a Pro subscription and a Console org).")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             if let usage = account.usage {
                 LabeledContent("Plan", value: usage.planLabel)
                 if let primary = usage.primaryWindow {
