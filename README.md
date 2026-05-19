@@ -21,21 +21,36 @@ Lives in the menu bar. No Dock icon, no main window. Click the sparkles icon to 
 - A claude.ai Pro or Max subscription on each account you want to track
 - Xcode 16+ and [xcodegen](https://github.com/yonaskolb/XcodeGen) to build from source
 
-## Build & install
+## Install
+
+### Easy: download the DMG
+
+1. Grab the latest `ClaudeWidget-x.y.z.dmg` from the [Releases](https://github.com/thinshaw/claude-usage-widget/releases) page
+2. Open the DMG and drag `ClaudeWidget.app` onto the `Applications` shortcut
+3. **First launch:** right-click `ClaudeWidget` in Applications → **Open** → confirm **Open** in the Gatekeeper dialog. (The app is ad-hoc signed — no paid Developer ID — so macOS asks once. After the first approval, normal double-click works.)
+
+The sparkles icon should appear in your menu bar. From there, click it → **Settings…** to paste session cookies.
+
+### From source
 
 ```bash
 brew install xcodegen          # one-time
-cd ClaudeWidget
-xcodegen                       # regenerates ClaudeWidget.xcodeproj
+git clone https://github.com/thinshaw/claude-usage-widget.git
+cd claude-usage-widget
+./scripts/make-dmg.sh          # produces build/ClaudeWidget-x.y.z.dmg
+open build/ClaudeWidget-*.dmg
+```
+
+Or skip the DMG and run directly out of the build folder:
+
+```bash
+xcodegen
 xcodebuild -project ClaudeWidget.xcodeproj \
            -scheme ClaudeWidget \
            -configuration Release \
            -derivedDataPath build/ build
-cp -R build/Build/Products/Release/ClaudeWidget.app /Applications/
-open /Applications/ClaudeWidget.app
+open build/Build/Products/Release/ClaudeWidget.app
 ```
-
-The sparkles icon should appear in your menu bar.
 
 ## Setup — pasting session cookies
 
