@@ -1,0 +1,25 @@
+# .NET / Visual Studio build artifacts
+bin/
+obj/
+out/
+*.user
+.vs/
+.vscode/
+
+# Published builds
+publish/
+*.zip
+*.msix
+*.msixbundle
+
+# NuGet caches
+packages/
+*.nupkg
+
+# Generated files
+*.g.cs
+*.g.i.cs
+
+# OS junk
+Thumbs.db
+.DS_Store

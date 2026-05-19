@@ -1,6 +1,17 @@
 # Claude Usage Widget
 
-A native macOS menu-bar app that surfaces your Claude usage for up to two accounts (personal + work) side-by-side. Built because flipping between the desktop app and a private window just to check "how much do I have left?" got old.
+A native menu-bar / system-tray app that surfaces your Claude usage for up to two accounts (personal + work) side-by-side. Built because flipping between the desktop app and a private window just to check "how much do I have left?" got old.
+
+## Platforms
+
+| | macOS | Windows |
+|---|---|---|
+| **Status** | Shipped (v0.1.0) | In progress — scaffold complete, awaiting iteration on Windows |
+| **Source** | `Sources/`, `Resources/`, `project.yml` (repo root) | [`windows/ClaudeWidget/`](windows/ClaudeWidget/) |
+| **Install** | [DMG from Releases](https://github.com/thinshaw/claude-usage-widget/releases) → drag to Applications | Portable .zip (coming) |
+| **Requires** | macOS 14+ (Liquid Glass on macOS 26+) | Windows 10 1809+ / Windows 11 |
+
+The rest of this README documents the **macOS** version. Windows-specific notes are in [`windows/ClaudeWidget/README.md`](windows/ClaudeWidget/README.md).
 
 Lives in the menu bar. No Dock icon, no main window. Click the sparkles icon to see your current 5-hour and 7-day windows, optional Opus/Sonnet sub-limits, and extra-usage credits if you have them enabled.
 
