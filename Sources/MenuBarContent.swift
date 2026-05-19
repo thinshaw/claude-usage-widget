@@ -196,8 +196,11 @@ struct ExtraUsageRow: View {
                 Text("Extra usage")
                     .font(.system(size: 11, weight: .medium))
                 Spacer()
-                Text(format(money: extra.usedCredits) + " / " + format(money: extra.monthlyLimit))
+                Text("\(Int(round(extra.utilization * 100)))%")
                     .font(theme.monoFont)
+                Text("· \(format(money: extra.usedCredits)) / \(format(money: extra.monthlyLimit))")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
             }
             UsageBar(utilization: extra.utilization, theme: theme)
         }
