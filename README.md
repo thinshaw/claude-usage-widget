@@ -17,7 +17,7 @@ Lives in the menu bar. No Dock icon, no main window. Click the sparkles icon to 
 
 ## Features
 
-- **Two-account support** — track personal and work claude.ai accounts side-by-side, each with its own session cookie stored in Keychain
+- **Two-account support** — track personal and work claude.ai accounts side-by-side, each with its own session cookie stored locally on disk (user-only readable)
 - **Same numbers as the desktop app** — pulls live data from the same `claude.ai/api/organizations/{uuid}/usage` endpoint Settings → Usage uses
 - **Two themes** —
   - **Liquid Glass** uses macOS 26 Tahoe's native `.glassEffect()` and follows system light/dark
@@ -170,10 +170,11 @@ The response shape (real, captured 2026-05-19):
 
 ## Privacy
 
-- Session cookies live in the macOS Keychain under `com.tobyhinshaw.claudewidget`. Nothing is stored in plaintext on disk.
+- Session cookies live in `~/Library/Application Support/ClaudeWidget/credentials.json` with file permissions `0600` (only your user can read it). On a File-Vault'd Mac the file is also encrypted at rest by the OS.
 - All network requests go directly to `claude.ai`. No telemetry, no analytics, no third-party services.
 - The widget never sees your Anthropic password or any API keys.
-- If you uninstall, run `security delete-generic-password -s com.tobyhinshaw.claudewidget` to remove the Keychain entries (or just leave them — they're harmless).
+- To uninstall completely: trash `/Applications/ClaudeWidget.app` and `rm -rf "$HOME/Library/Application Support/ClaudeWidget/"`.
+- Earlier versions stored cookies in the macOS Keychain. They migrate automatically on first launch of v0.1.1+ and the old Keychain entries are removed.
 
 ## Source layout
 
@@ -187,7 +188,7 @@ ClaudeWidget/
 │   ├── Theme.swift                      # Liquid Glass + Sci-Fi backgrounds and accents
 │   ├── UsageProvider.swift              # Protocol + MockUsageProvider
 │   ├── ClaudeAIUsageProvider.swift      # Real provider: claude.ai endpoints
-│   ├── SessionCookieStore.swift         # Keychain wrapper for sessionKey
+│   ├── SessionCookieStore.swift         # File-backed sessionKey storage (Keychain migration baked in)
 │   ├── OrgIDStore.swift                 # UserDefaults cache for org UUID per account
 │   ├── MenuBarContent.swift             # Dropdown UI (AccountCard, UsageWindowRow, etc.)
 │   └── SettingsView.swift               # Settings window (General / Accounts / About)
