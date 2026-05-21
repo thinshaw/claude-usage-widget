@@ -68,6 +68,7 @@ private struct AccountRow: View {
     @State private var cookieDraft: String = ""
     @State private var message: String?
     @State private var messageIsError: Bool = false
+    @State private var showingInAppSignIn: Bool = false
 
     var body: some View {
         Section(account.kind.displayName) {
@@ -85,6 +86,9 @@ private struct AccountRow: View {
 
                 Button("Save") { save() }
                     .disabled(!account.isConfigured || cookieDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                Button("Sign in") { showingInAppSignIn = true }
+                    .disabled(!account.isConfigured)
 
                 Button("Clear") { clear() }
                     .disabled(!state.hasSessionCookie(for: account.kind))
@@ -135,6 +139,23 @@ private struct AccountRow: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .sheet(isPresented: $showingInAppSignIn) {
+            InAppAuthSheet(
+                kind: account.kind,
+                onCookieCaptured: { cookie in
+                    let ok = state.saveSessionCookie(cookie, for: account.kind)
+                    if ok {
+                        message = "Signed in and saved. Refreshing usage…"
+                        messageIsError = false
+                        showingInAppSignIn = false
+                    } else {
+                        message = "Captured cookie but failed to save."
+                        messageIsError = true
+                    }
+                },
+                onCancel: { showingInAppSignIn = false }
+            )
+        }
     }
 
     private func save() {
@@ -145,7 +166,7 @@ private struct AccountRow: View {
             message = "Saved. Refreshing usage…"
             messageIsError = false
         } else {
-            message = "Failed to save to Keychain."
+            message = "Failed to save cookie."
             messageIsError = true
         }
     }
