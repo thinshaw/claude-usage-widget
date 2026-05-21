@@ -29,7 +29,7 @@ struct MenuBarLabel: View {
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: "sparkles")
-            if let pct = state.peakUtilization {
+            if let pct = state.selectedMenuBarUtilization {
                 Text("\(Int(round(pct * 100)))%")
                     .font(.system(size: 11, weight: .medium, design: .rounded))
                     .monospacedDigit()

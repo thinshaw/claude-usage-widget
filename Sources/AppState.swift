@@ -9,6 +9,9 @@ final class AppState: ObservableObject {
     }
     @Published var isRefreshing: Bool = false
     @Published var lastError: String?
+    @Published var selectedMenuBarAccount: AccountKind {
+        didSet { UserDefaults.standard.set(selectedMenuBarAccount.rawValue, forKey: "selectedMenuBarAccount") }
+    }
 
     private var refreshTimer: Timer?
     private let realProvider = ClaudeAIUsageProvider()
@@ -22,6 +25,9 @@ final class AppState: ObservableObject {
         let savedTheme = UserDefaults.standard.string(forKey: "selectedThemeId")
             .flatMap(Theme.init(rawValue:)) ?? .liquidGlass
         self.theme = savedTheme
+        let savedMenuBarAccount = UserDefaults.standard.string(forKey: "selectedMenuBarAccount")
+            .flatMap(AccountKind.init(rawValue:)) ?? .personal
+        self.selectedMenuBarAccount = savedMenuBarAccount
 
         self.accounts = [
             Account(kind: .personal, label: "Personal", isConfigured: true, usage: nil,
@@ -39,13 +45,13 @@ final class AppState: ObservableObject {
         startAutoRefresh()
     }
 
-    /// Highest utilization across every active limit on every configured
-    /// account. Drives the menu-bar percentage badge — "the most-maxed-out
-    /// thing I'm tracking right now."
-    var peakUtilization: Double? {
-        let configured = accounts.filter { $0.isConfigured }
-        let peaks = configured.compactMap { $0.usage?.peakUtilization }
-        return peaks.max()
+    /// Utilization for whichever account the user selected for the menu-bar
+    /// badge.
+    var selectedMenuBarUtilization: Double? {
+        guard let account = accounts.first(where: { $0.kind == selectedMenuBarAccount && $0.isConfigured }) else {
+            return nil
+        }
+        return account.usage?.peakUtilization
     }
 
     func refreshAll() async {
@@ -93,7 +99,13 @@ final class AppState: ObservableObject {
     func setAccountConfigured(_ configured: Bool, for kind: AccountKind) {
         guard let idx = accounts.firstIndex(where: { $0.kind == kind }) else { return }
         accounts[idx].isConfigured = configured
-        if !configured { accounts[idx].usage = nil }
+        if !configured {
+            accounts[idx].usage = nil
+            if selectedMenuBarAccount == kind,
+               let fallback = accounts.first(where: { $0.isConfigured && $0.kind != kind })?.kind {
+                selectedMenuBarAccount = fallback
+            }
+        }
     }
 
     @discardableResult

@@ -9,6 +9,10 @@ struct MenuBarContent: View {
         VStack(alignment: .leading, spacing: 14) {
             header
 
+            if state.accounts.filter({ $0.isConfigured }).count > 1 {
+                menuBarAccountToggle
+            }
+
             ForEach(state.accounts.filter { $0.isConfigured }) { account in
                 AccountCard(account: account, theme: state.theme)
             }
@@ -67,6 +71,20 @@ struct MenuBarContent: View {
             RefreshButton(isRefreshing: state.isRefreshing) {
                 Task { await state.refreshAll() }
             }
+        }
+    }
+
+    private var menuBarAccountToggle: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Menu bar shows")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.secondary)
+            Picker("Menu bar shows", selection: $state.selectedMenuBarAccount) {
+                ForEach(state.accounts.filter { $0.isConfigured }) { account in
+                    Text(account.label).tag(account.kind)
+                }
+            }
+            .pickerStyle(.segmented)
         }
     }
 
